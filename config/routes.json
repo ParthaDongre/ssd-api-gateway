@@ -1,0 +1,27 @@
+{
+  "routes": {
+    "/api/v1/auth": {
+      "target": "http://localhost:5001",
+      "stripPrefix": true,
+      "publicPaths": [
+        "/login",
+        "/register",
+        "/health"
+      ]
+    },
+    "/api/v1/users": {
+      "target": "http://localhost:5002",
+      "stripPrefix": true,
+      "publicPaths": [
+        "/health"
+      ]
+    },
+    "/api/v1/orders": {
+      "target": "http://localhost:5003",
+      "stripPrefix": true,
+      "publicPaths": [
+        "/health"
+      ]
+    }
+  }
+}
