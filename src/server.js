@@ -5,7 +5,8 @@ const express = require("express");
 const {
   initializeConfig,
   resolveRoute,
-  stopWatching
+  stopWatching,
+  getActiveRoutes
 } = require("./config/configLoader");
 
 const authMiddleware = require("./middleware/authMiddleware");
@@ -16,6 +17,19 @@ const PORT = Number(process.env.PORT || 8000);
 
 app.disable("x-powered-by");
 
+// CORS headers to enable seamless local frontend and dev tool integration
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 // The gateway handles requests and streams them downstream.
 // It deliberately does not parse request bodies before proxying them.
 app.get("/health", (req, res) => {
@@ -24,6 +38,17 @@ app.get("/health", (req, res) => {
     status: "healthy",
     port: PORT,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Safe read-only configuration introspection endpoint for developer dashboard
+app.get("/api/v1/gateway/routes", (req, res) => {
+  const routes = getActiveRoutes ? getActiveRoutes() : {};
+  res.status(200).json({
+    service: "dynamic-l7-api-gateway",
+    status: "healthy",
+    count: Object.keys(routes).length,
+    routes
   });
 });
 
@@ -90,25 +115,34 @@ function shutdown(signal) {
   }, 10000).unref();
 }
 
-function startServer() {
+function startServer(port = PORT) {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET must be set in the .env file.");
   }
 
   initializeConfig();
 
-  server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Gateway] Listening on http://localhost:${PORT}`);
-    console.log("[Gateway] Dynamic routing and JWT authentication enabled.");
-  });
+  return new Promise((resolve, reject) => {
+    server = app.listen(port, "0.0.0.0", () => {
+      console.log(`[Gateway] Listening on http://localhost:${port}`);
+      console.log("[Gateway] Dynamic routing and JWT authentication enabled.");
+      resolve(server);
+    });
 
-  server.on("error", (error) => {
-    console.error("[Gateway] Server error:", error.message);
-    process.exitCode = 1;
-  });
+    server.on("error", (error) => {
+      console.error("[Gateway] Server error:", error.message);
+      reject(error);
+    });
 
-  process.once("SIGINT", () => shutdown("SIGINT"));
-  process.once("SIGTERM", () => shutdown("SIGTERM"));
+    process.once("SIGINT", () => shutdown("SIGINT"));
+    process.once("SIGTERM", () => shutdown("SIGTERM"));
+  });
 }
 
-startServer();
+if (require.main === module) {
+  startServer().catch(() => {
+    process.exit(1);
+  });
+}
+
+module.exports = { app, startServer, shutdown };

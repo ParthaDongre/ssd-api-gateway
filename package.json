@@ -9,16 +9,20 @@
     "dev": "nodemon src/server.js",
     "auth": "node mock-services/authService.js",
     "users": "node mock-services/userService.js",
-    "orders": "node mock-services/orderService.js"
+    "orders": "node mock-services/orderService.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test tests/integration.test.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "http-proxy-middleware": "^3.0.5",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.11.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

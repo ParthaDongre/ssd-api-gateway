@@ -32,8 +32,18 @@ function createRouteProxy(route) {
 
     on: {
       proxyReq: (proxyReq, req) => {
+        // Prevent header spoofing: strip any client-supplied internal identity headers
+        proxyReq.removeHeader("x-authenticated-user");
+        proxyReq.removeHeader("X-Authenticated-User");
+        proxyReq.removeHeader("x-authenticated-username");
+        proxyReq.removeHeader("X-Authenticated-Username");
+
+        // Inject verified identity derived exclusively from the authenticated JWT
         if (req.user && req.user.sub) {
           proxyReq.setHeader("X-Authenticated-User", String(req.user.sub));
+          if (req.user.username) {
+            proxyReq.setHeader("X-Authenticated-Username", String(req.user.username));
+          }
         }
       },
 

@@ -257,8 +257,13 @@ function stopWatching() {
   }
 }
 
+function getActiveRoutes() {
+  return JSON.parse(JSON.stringify(activeRoutes));
+}
+
 module.exports = {
   initializeConfig,
   resolveRoute,
-  stopWatching
+  stopWatching,
+  getActiveRoutes
 };

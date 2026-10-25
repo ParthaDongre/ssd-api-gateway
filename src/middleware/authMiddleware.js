@@ -3,6 +3,10 @@ const jwt = require("jsonwebtoken");
 function authMiddleware(req, res, next) {
   const route = req.gatewayRoute;
 
+  // Always delete untrusted identity headers from the incoming request object
+  delete req.headers["x-authenticated-user"];
+  delete req.headers["x-authenticated-username"];
+
   if (!route) {
     return res.status(404).json({
       error: "Route Not Found",
