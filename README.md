@@ -129,7 +129,7 @@ ORDER_SERVICE_PORT=5003
 MONGODB_URI=mongodb://127.0.0.1:27017/ssd_api_gateway
 
 # JWT Configuration
-JWT_SECRET=supersecretkey123
+JWT_SECRET=Yourpassword
 JWT_EXPIRES_IN=1h
 ```
 
