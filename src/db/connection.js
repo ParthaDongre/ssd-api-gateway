@@ -1,46 +1,63 @@
-const mongoose = require("mongoose");
+require("dotenv").config();
+const { getClient, ensureTables, resetMemoryStore } = require("./dynamoClient");
 
-let isConnecting = false;
+let isConnected = true;
 
-async function connectDB(customUri) {
-  const uri = customUri || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ssd_api_gateway";
-
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
-  if (isConnecting) {
-    return new Promise((resolve, reject) => {
-      mongoose.connection.once("open", () => resolve(mongoose.connection));
-      mongoose.connection.once("error", reject);
-    });
-  }
-
-  isConnecting = true;
-
+async function connectDB() {
+  const { isUsingCloud } = getClient();
   try {
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000
-    });
-    console.log(`[MongoDB] Connected successfully to: ${uri.replace(/\/\/.*@/, "//***@")}`);
-    return mongoose.connection;
+    const tableInfo = await ensureTables();
+    isConnected = true;
+    if (isUsingCloud) {
+      console.log(`[Database] Connected successfully to Cloud Database.`);
+    } else {
+      console.log(`[Database] Ready in Local Persistent Storage mode.`);
+    }
+    return { status: "connected", cloud: isUsingCloud, tableInfo };
   } catch (error) {
-    console.error(`[MongoDB] Connection error for ${uri}:`, error.message);
+    console.error("[Database] Initialization error:", error.message);
+    isConnected = false;
     throw error;
-  } finally {
-    isConnecting = false;
   }
 }
 
 async function disconnectDB() {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-    console.log("[MongoDB] Disconnected.");
-  }
+  isConnected = false;
+  console.log("[Database] Disconnected.");
 }
+
+function getDatabaseStatus() {
+  const { isUsingCloud } = getClient();
+  return {
+    engine: "DynamoDB",
+    type: isUsingCloud ? "Cloud Database" : "Local Persistent Store",
+    connected: isConnected,
+    region: process.env.AWS_REGION || "us-east-1",
+    usersTable: process.env.DYNAMODB_USERS_TABLE || "ssd_users",
+    ordersTable: process.env.DYNAMODB_ORDERS_TABLE || "ssd_orders"
+  };
+}
+
+// Backward-compatibility shim for microservices and health checks
+const mongooseShim = {
+  connection: {
+    get readyState() {
+      return isConnected ? 1 : 0;
+    },
+    once: (event, cb) => {
+      if (event === "open") setTimeout(cb, 50);
+    }
+  },
+  Types: {
+    ObjectId: {
+      isValid: (id) => typeof id === "string" && id.trim().length >= 3
+    }
+  }
+};
 
 module.exports = {
   connectDB,
   disconnectDB,
-  mongoose
+  getDatabaseStatus,
+  mongoose: mongooseShim
 };

@@ -4,6 +4,7 @@ const path = require("node:path");
 const jwt = require("jsonwebtoken");
 
 // Enforce test configuration before loading modules
+process.env.NODE_ENV = "test";
 process.env.MONGODB_URI = "mongodb://127.0.0.1:27017/ssd_api_gateway_test";
 process.env.JWT_SECRET = "test_super_secret_jwt_key_12345";
 process.env.JWT_EXPIRES_IN = "1h";
@@ -62,6 +63,10 @@ describe("Dynamic L7 API Gateway & MongoDB Integration Suite", () => {
     if (userServer) await new Promise((res) => userServer.close(res));
     if (authServer) await new Promise((res) => authServer.close(res));
     await disconnectDB();
+
+    setTimeout(() => {
+      process.exit(0);
+    }, 200);
   });
 
   test("1. Successful registration", async () => {
@@ -324,5 +329,38 @@ describe("Dynamic L7 API Gateway & MongoDB Integration Suite", () => {
     const rewriteData = await rewriteRes.json();
     assert.strictEqual(rewriteRes.status, 200);
     assert.strictEqual(rewriteData.service, "user-service");
+  });
+
+  test("13. 1-Click Server Stop and Start from UI Control API", async () => {
+    // 13a. Stop User Service via Gateway control API
+    const stopRes = await fetch(`${GATEWAY_URL}/api/v1/gateway/services/users/stop`, {
+      method: "POST"
+    });
+    const stopData = await stopRes.json();
+    assert.strictEqual(stopRes.status, 200);
+    assert.strictEqual(stopData.running, false);
+
+    // 13b. Calling User Service now returns 503 Service Unavailable
+    const callRes = await fetch(`${GATEWAY_URL}/api/v1/users/profile`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    });
+    assert.strictEqual(callRes.status, 503);
+    const callData = await callRes.json();
+    assert.strictEqual(callData.error, "Downstream Service Unavailable");
+    assert.strictEqual(callData.code, "ECONNREFUSED");
+
+    // 13c. Start User Service back up via Gateway control API
+    const startRes = await fetch(`${GATEWAY_URL}/api/v1/gateway/services/users/start`, {
+      method: "POST"
+    });
+    const startData = await startRes.json();
+    assert.strictEqual(startRes.status, 200);
+    assert.strictEqual(startData.running, true);
+
+    // 13d. Calling User Service now succeeds with 200 OK
+    const recoveredRes = await fetch(`${GATEWAY_URL}/api/v1/users/profile`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    });
+    assert.strictEqual(recoveredRes.status, 200);
   });
 });

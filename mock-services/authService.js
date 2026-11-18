@@ -5,7 +5,7 @@ require("dotenv").config({
 
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const { connectDB, mongoose } = require("../src/db/connection");
+const { connectDB, getDatabaseStatus } = require("../src/db/connection");
 const User = require("../src/models/User");
 
 const app = express();
@@ -14,18 +14,20 @@ const PORT = Number(process.env.AUTH_SERVICE_PORT || 5001);
 app.disable("x-powered-by");
 app.use(express.json({ limit: "64kb" }));
 
-// Connect to MongoDB upon service startup
+// Connect to DynamoDB upon service startup
 connectDB().catch((err) => {
-  console.error("[Auth Service] Initial MongoDB connection failed:", err.message);
+  console.error("[Auth Service] Initial DynamoDB connection failed:", err.message);
 });
 
 app.get("/health", (req, res) => {
-  const isDbConnected = mongoose.connection.readyState === 1;
+  const dbStatus = getDatabaseStatus ? getDatabaseStatus() : { connected: true, engine: "DynamoDB" };
   res.status(200).json({
     service: "auth-service",
     status: "healthy",
     port: PORT,
-    database: isDbConnected ? "connected" : "disconnected",
+    database: dbStatus.connected ? "connected" : "disconnected",
+    dbEngine: dbStatus.engine,
+    dbType: dbStatus.type,
     timestamp: new Date().toISOString()
   });
 });
@@ -186,18 +188,61 @@ app.post("/login", async (req, res) => {
 });
 
 let serverInstance;
+let isStarting = false;
 
 function startServer(port = PORT) {
-  return new Promise((resolve) => {
+  if (serverInstance && serverInstance.listening) {
+    return Promise.resolve(serverInstance);
+  }
+  if (isStarting) {
+    return new Promise((resolve) => {
+      const check = setInterval(() => {
+        if (serverInstance && serverInstance.listening) {
+          clearInterval(check);
+          resolve(serverInstance);
+        }
+      }, 50);
+    });
+  }
+  isStarting = true;
+  return new Promise((resolve, reject) => {
     serverInstance = app.listen(port, "0.0.0.0", () => {
+      isStarting = false;
       console.log(`[Auth Service] Listening on http://localhost:${port}`);
       resolve(serverInstance);
     });
+    serverInstance.on("error", (err) => {
+      isStarting = false;
+      if (err.code === "EADDRINUSE") {
+        resolve(serverInstance);
+      } else {
+        console.error("[Auth Service] Server error:", err.message);
+        reject(err);
+      }
+    });
   });
+}
+
+function stopServer() {
+  return new Promise((resolve) => {
+    if (serverInstance) {
+      serverInstance.close(() => {
+        console.log(`[Auth Service] Stopped listening on port ${PORT}`);
+        serverInstance = null;
+        resolve(true);
+      });
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+function isRunning() {
+  return !!(serverInstance && serverInstance.listening);
 }
 
 if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, startServer };
+module.exports = { app, startServer, stopServer, isRunning };

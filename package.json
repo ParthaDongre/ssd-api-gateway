@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "build": "cd frontend && npm install && npm run build",
     "auth": "node mock-services/authService.js",
     "users": "node mock-services/userService.js",
     "orders": "node mock-services/orderService.js",
@@ -17,12 +18,15 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1171.0",
+    "@aws-sdk/lib-dynamodb": "^3.1171.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.11.4"
+    "mongoose": "^9.11.4",
+    "uuid": "^14.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

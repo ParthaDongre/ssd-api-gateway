@@ -4,7 +4,7 @@ require("dotenv").config({
 });
 
 const express = require("express");
-const { connectDB, mongoose } = require("../src/db/connection");
+const { connectDB, getDatabaseStatus, mongoose } = require("../src/db/connection");
 const Order = require("../src/models/Order");
 
 const app = express();
@@ -14,16 +14,18 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "64kb" }));
 
 connectDB().catch((err) => {
-  console.error("[Order Service] Initial MongoDB connection failed:", err.message);
+  console.error("[Order Service] Initial DynamoDB connection failed:", err.message);
 });
 
 app.get("/health", (req, res) => {
-  const isDbConnected = mongoose.connection.readyState === 1;
+  const dbStatus = getDatabaseStatus ? getDatabaseStatus() : { connected: true, engine: "DynamoDB" };
   res.status(200).json({
     service: "order-service",
     status: "healthy",
     port: PORT,
-    database: isDbConnected ? "connected" : "disconnected",
+    database: dbStatus.connected ? "connected" : "disconnected",
+    dbEngine: dbStatus.engine,
+    dbType: dbStatus.type,
     timestamp: new Date().toISOString()
   });
 });
@@ -174,18 +176,61 @@ app.get("/:orderId", async (req, res) => {
 });
 
 let serverInstance;
+let isStarting = false;
 
 function startServer(port = PORT) {
-  return new Promise((resolve) => {
+  if (serverInstance && serverInstance.listening) {
+    return Promise.resolve(serverInstance);
+  }
+  if (isStarting) {
+    return new Promise((resolve) => {
+      const check = setInterval(() => {
+        if (serverInstance && serverInstance.listening) {
+          clearInterval(check);
+          resolve(serverInstance);
+        }
+      }, 50);
+    });
+  }
+  isStarting = true;
+  return new Promise((resolve, reject) => {
     serverInstance = app.listen(port, "0.0.0.0", () => {
+      isStarting = false;
       console.log(`[Order Service] Listening on http://localhost:${port}`);
       resolve(serverInstance);
     });
+    serverInstance.on("error", (err) => {
+      isStarting = false;
+      if (err.code === "EADDRINUSE") {
+        resolve(serverInstance);
+      } else {
+        console.error("[Order Service] Server error:", err.message);
+        reject(err);
+      }
+    });
   });
+}
+
+function stopServer() {
+  return new Promise((resolve) => {
+    if (serverInstance) {
+      serverInstance.close(() => {
+        console.log(`[Order Service] Stopped listening on port ${PORT}`);
+        serverInstance = null;
+        resolve(true);
+      });
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+function isRunning() {
+  return !!(serverInstance && serverInstance.listening);
 }
 
 if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, startServer };
+module.exports = { app, startServer, stopServer, isRunning };

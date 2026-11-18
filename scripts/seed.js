@@ -8,7 +8,7 @@ const User = require("../src/models/User");
 const Order = require("../src/models/Order");
 
 async function seed() {
-  console.log("🌱 [Seed] Starting MongoDB database seed...");
+  console.log("🌱 [Seed] Starting DynamoDB database seed...");
 
   try {
     await connectDB();

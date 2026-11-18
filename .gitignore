@@ -9,4 +9,7 @@ yarn-error.log*
 coverage/
 dist/
 build/
+frontend/dist/
+data/
+data/*
 *.log

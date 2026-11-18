@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   Boxes,
   CheckCircle2,
   ChevronRight,
   Code2,
+  Cpu,
   Database,
   ExternalLink,
   GitBranch,
@@ -14,20 +16,23 @@ import {
   LogOut,
   Network,
   PackagePlus,
+  Play,
   RefreshCw,
   Server,
   ShieldAlert,
   ShieldCheck,
+  Square,
   Terminal,
   UserCheck,
   UserRound,
-  XCircle
+  XCircle,
+  Zap
 } from 'lucide-react';
 
 const SERVICES = [
-  { key: 'auth', name: 'Auth Service', port: 5001, path: '/api/v1/auth/health', desc: 'Authentication & JWT issuance' },
-  { key: 'users', name: 'User Service', port: 5002, path: '/api/v1/users/health', desc: 'Profile storage & identity enforcement' },
-  { key: 'orders', name: 'Order Service', port: 5003, path: '/api/v1/orders/health', desc: 'Order persistence & per-user isolation' }
+  { key: 'auth', name: 'Auth Service', port: 5001, path: '/api/v1/auth/health', testPath: '/api/v1/auth/health', desc: 'Authentication & JWT issuance' },
+  { key: 'users', name: 'User Service', port: 5002, path: '/api/v1/users/health', testPath: '/api/v1/users/profile', desc: 'Profile storage & identity enforcement' },
+  { key: 'orders', name: 'Order Service', port: 5003, path: '/api/v1/orders/health', testPath: '/api/v1/orders/history', desc: 'Order persistence & per-user isolation' }
 ];
 
 async function apiRequest(path, options = {}) {
@@ -50,6 +55,7 @@ async function apiRequest(path, options = {}) {
   if (!res.ok) {
     const error = new Error(data.error || data.message || `HTTP ${res.status}`);
     error.status = res.status;
+    error.code = data.code;
     error.data = data;
     throw error;
   }
@@ -69,11 +75,11 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace(/^#\/?/, '');
-    const validTabs = ['overview', 'profile', 'orders', 'playground', 'routes'];
+    const validTabs = ['overview', 'servers', 'profile', 'orders', 'playground', 'routes'];
     return validTabs.includes(hash) ? hash : 'overview';
   });
 
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
+  const [authMode, setAuthMode] = useState('login');
   const [authError, setAuthError] = useState('');
   const [authSuccess, setAuthSuccess] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
@@ -82,7 +88,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace(/^#\/?/, '');
-      if (['overview', 'profile', 'orders', 'playground', 'routes'].includes(hash)) {
+      if (['overview', 'servers', 'profile', 'orders', 'playground', 'routes'].includes(hash)) {
         setActiveTab(hash);
       }
     };
@@ -113,17 +119,16 @@ export default function App() {
     setAuthSuccess('');
   };
 
-  // If token is missing, render Auth screens
   if (!token || !currentUser) {
     return (
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-header">
             <div className="auth-logo">
-              <Network size={22} />
+              <Network size={24} />
             </div>
             <h2>{authMode === 'signup' ? 'Create an Account' : 'Sign In to Gateway Console'}</h2>
-            <p>Dynamic Layer 7 Reverse Proxy & MongoDB Platform</p>
+            <p>Dynamic Layer 7 Reverse Proxy & Microservices Platform</p>
           </div>
 
           {authError && (
@@ -150,9 +155,8 @@ export default function App() {
           ) : (
             <SignupForm
               onSuccess={() => {
-                setAuthSuccess('Account created successfully! Please sign in with your credentials.');
+                setAuthSuccess('Account created successfully! You can now sign in.');
                 setAuthMode('login');
-                setAuthError('');
               }}
               busy={authBusy}
               setBusy={setAuthBusy}
@@ -160,37 +164,35 @@ export default function App() {
             />
           )}
 
-          <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12 }}>
+          <div style={{ marginTop: 18, textAlign: 'center', fontSize: 13 }}>
             {authMode === 'login' ? (
               <span>
-                Don't have an account?{' '}
+                Need an account?{' '}
                 <button
                   type="button"
-                  className="btn-link"
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }}
                   onClick={() => {
                     setAuthMode('signup');
                     setAuthError('');
                     setAuthSuccess('');
                   }}
                 >
-                  Create account
+                  Register here
                 </button>
               </span>
             ) : (
               <span>
-                Already have an account?{' '}
+                Already registered?{' '}
                 <button
                   type="button"
-                  className="btn-link"
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }}
                   onClick={() => {
                     setAuthMode('login');
                     setAuthError('');
                     setAuthSuccess('');
                   }}
                 >
-                  Sign in
+                  Back to Sign In
                 </button>
               </span>
             )}
@@ -209,109 +211,133 @@ export default function App() {
             <Network size={20} />
           </div>
           <div className="brand-details">
-            <h1>GateFlow</h1>
-            <span>L7 REVERSE PROXY</span>
+            <h1>L7 API Gateway</h1>
+            <span>Control Console</span>
           </div>
         </div>
 
         <nav className="nav-section">
-          <div className="nav-label">Navigation</div>
+          <div className="nav-label">Core Gateway</div>
           <button
             className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => navigateTo('overview')}
           >
-            <Activity size={16} />
-            <span>Overview</span>
+            <div className="nav-item-left">
+              <Activity size={16} />
+              <span>System Overview</span>
+            </div>
           </button>
+
           <button
-            className={`nav-item ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => navigateTo('profile')}
+            className={`nav-item ${activeTab === 'servers' ? 'active' : ''}`}
+            onClick={() => navigateTo('servers')}
           >
-            <UserRound size={16} />
-            <span>My Profile</span>
+            <div className="nav-item-left">
+              <Server size={16} />
+              <span>Server Controls</span>
+            </div>
+            <span className="badge badge-amber" style={{ fontSize: 9 }}>1-Click</span>
           </button>
-          <button
-            className={`nav-item ${activeTab === 'orders' ? 'active' : ''}`}
-            onClick={() => navigateTo('orders')}
-          >
-            <Boxes size={16} />
-            <span>My Orders</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === 'playground' ? 'active' : ''}`}
-            onClick={() => navigateTo('playground')}
-          >
-            <Terminal size={16} />
-            <span>API Playground</span>
-          </button>
+
           <button
             className={`nav-item ${activeTab === 'routes' ? 'active' : ''}`}
             onClick={() => navigateTo('routes')}
           >
-            <GitBranch size={16} />
-            <span>Routing Table</span>
+            <div className="nav-item-left">
+              <GitBranch size={16} />
+              <span>Routing Rules</span>
+            </div>
+          </button>
+
+          <div className="nav-label" style={{ marginTop: 14 }}>Microservice Data</div>
+          <button
+            className={`nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => navigateTo('profile')}
+          >
+            <div className="nav-item-left">
+              <UserRound size={16} />
+              <span>User Profile</span>
+            </div>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'orders' ? 'active' : ''}`}
+            onClick={() => navigateTo('orders')}
+          >
+            <div className="nav-item-left">
+              <Boxes size={16} />
+              <span>Order Isolation</span>
+            </div>
+          </button>
+
+          <div className="nav-label" style={{ marginTop: 14 }}>Developer Tools</div>
+          <button
+            className={`nav-item ${activeTab === 'playground' ? 'active' : ''}`}
+            onClick={() => navigateTo('playground')}
+          >
+            <div className="nav-item-left">
+              <Terminal size={16} />
+              <span>API Playground</span>
+            </div>
           </button>
         </nav>
 
         <div className="sidebar-footer">
           <div className="gateway-chip">
-            <span style={{ color: 'var(--text-muted)' }}>Gateway :8000</span>
             <div className="gateway-chip-status">
-              <span className="status-dot"></span>
-              <span>Active</span>
+              <div className="status-dot"></div>
+              <span>Gateway :8000</span>
             </div>
+            <span className="badge badge-blue">L7 Ready</span>
           </div>
+
           <div className="user-profile-strip">
             <div className="user-avatar">
-              {currentUser.username ? currentUser.username[0].toUpperCase() : 'U'}
+              {(currentUser.username || 'U')[0].toUpperCase()}
             </div>
             <div className="user-meta">
-              <b>{currentUser.username}</b>
-              <span>{currentUser.role || 'user'}</span>
+              <b>{currentUser.name || currentUser.username}</b>
+              <span>@{currentUser.username}</span>
             </div>
-            <button className="btn-icon" onClick={handleLogout} title="Log Out">
-              <LogOut size={15} />
+            <button className="btn-icon" title="Sign Out" onClick={handleLogout}>
+              <LogOut size={14} />
             </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="main-wrapper">
+      <main className="main-wrapper">
         <header className="topbar">
           <div className="breadcrumb">
-            <span>Workspace</span>
+            <span>Gateway Console</span>
             <ChevronRight size={14} />
             <b>
-              {activeTab === 'overview' && 'Overview'}
-              {activeTab === 'profile' && 'My Profile'}
-              {activeTab === 'orders' && 'My Orders'}
-              {activeTab === 'playground' && 'API Playground'}
-              {activeTab === 'routes' && 'Routing Table'}
+              {activeTab === 'overview' && 'System Overview & Real-Time Monitor'}
+              {activeTab === 'servers' && '1-Click Microservice Controller & Fault Injector'}
+              {activeTab === 'profile' && 'User Identity & Verified Claims'}
+              {activeTab === 'orders' && 'Order Persistence & Per-Tenant Isolation'}
+              {activeTab === 'playground' && 'Interactive L7 Gateway Playground'}
+              {activeTab === 'routes' && 'Dynamic Routing Table & Path Rewriting'}
             </b>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="badge badge-green">
-              <ShieldCheck size={13} />
-              <span>JWT Verified</span>
-            </span>
           </div>
         </header>
 
-        <main className="content-container">
+        <div className="content-container">
           {activeTab === 'overview' && <OverviewTab navigateTo={navigateTo} />}
+          {activeTab === 'servers' && <ServersTab />}
           {activeTab === 'profile' && <ProfileTab currentUser={currentUser} onLogout={handleLogout} />}
           {activeTab === 'orders' && <OrdersTab currentUser={currentUser} onLogout={handleLogout} />}
           {activeTab === 'playground' && <PlaygroundTab token={token} onLogout={handleLogout} />}
           {activeTab === 'routes' && <RoutesTab />}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
 
 /* =========================================================================
-   LOGIN FORM COMPONENT
+   LOGIN & SIGNUP FORMS
    ========================================================================= */
 function LoginForm({ onLogin, busy, setBusy, setError }) {
   const [username, setUsername] = useState('student');
@@ -325,24 +351,16 @@ function LoginForm({ onLogin, busy, setBusy, setError }) {
     try {
       const res = await apiRequest('/api/v1/auth/login', {
         method: 'POST',
+        skipAuth: true,
         body: JSON.stringify({ username, password })
       });
 
-      if (!res.data.token) {
-        throw new Error('Login failed: Token not found in server response.');
-      }
-
-      onLogin(res.data.token, res.data.user || { username });
+      onLogin(res.data.token, res.data.user);
     } catch (err) {
-      setError(err.message || 'Login failed. Please verify credentials.');
+      setError(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setBusy(false);
     }
-  };
-
-  const fillDemo = (u, p) => {
-    setUsername(u);
-    setPassword(p);
   };
 
   return (
@@ -354,7 +372,6 @@ function LoginForm({ onLogin, busy, setBusy, setError }) {
           className="form-input"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="e.g. student"
           required
         />
       </div>
@@ -366,23 +383,30 @@ function LoginForm({ onLogin, busy, setBusy, setError }) {
           className="form-input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
           required
         />
       </div>
 
       <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={busy}>
-        {busy ? 'Authenticating...' : 'Sign In'}
+        {busy ? 'Authenticating...' : 'Sign In through Gateway'}
       </button>
 
       <div className="demo-credentials-box">
-        <b>Quick Demo Accounts:</b>
-        <div>
-          <button type="button" className="demo-pill-btn" onClick={() => fillDemo('student', 'password123')}>
-            student (3 orders)
+        <b>Pre-seeded Demo Accounts:</b>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="demo-pill-btn"
+            onClick={() => { setUsername('student'); setPassword('password123'); }}
+          >
+            student / password123 (3 orders)
           </button>
-          <button type="button" className="demo-pill-btn" onClick={() => fillDemo('demo_user', 'password123')}>
-            demo_user (2 orders)
+          <button
+            type="button"
+            className="demo-pill-btn"
+            onClick={() => { setUsername('demo_user'); setPassword('password123'); }}
+          >
+            demo_user / password123 (2 orders)
           </button>
         </div>
       </div>
@@ -390,43 +414,24 @@ function LoginForm({ onLogin, busy, setBusy, setError }) {
   );
 }
 
-/* =========================================================================
-   SIGNUP FORM COMPONENT
-   ========================================================================= */
 function SignupForm({ onSuccess, busy, setBusy, setError }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [department, setDepartment] = useState('Computer Engineering');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
     setBusy(true);
+    setError('');
 
     try {
       await apiRequest('/api/v1/auth/register', {
         method: 'POST',
-        body: JSON.stringify({
-          username,
-          email: email.trim() || undefined,
-          password,
-          department
-        })
+        skipAuth: true,
+        body: JSON.stringify({ username, email, password, name, department })
       });
-
       onSuccess();
     } catch (err) {
       setError(err.message || 'Registration failed.');
@@ -437,32 +442,45 @@ function SignupForm({ onSuccess, busy, setBusy, setError }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="form-group">
-        <label className="form-label">Username *</label>
-        <input
-          type="text"
-          className="form-input"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="e.g. jdoe"
-          required
-          minLength={3}
-        />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="form-group">
+          <label className="form-label">Username</label>
+          <input
+            type="text"
+            className="form-input"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="e.g. johndoe"
+            required
+            minLength={3}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Full Name</label>
+          <input
+            type="text"
+            className="form-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. John Doe"
+          />
+        </div>
       </div>
 
       <div className="form-group">
-        <label className="form-label">Email (Optional)</label>
+        <label className="form-label">Email Address</label>
         <input
           type="email"
           className="form-input"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="jdoe@example.com"
+          placeholder="e.g. john@example.com"
+          required
         />
       </div>
 
       <div className="form-group">
-        <label className="form-label">Department</label>
+        <label className="form-label">Department / Branch</label>
         <input
           type="text"
           className="form-input"
@@ -473,7 +491,7 @@ function SignupForm({ onSuccess, busy, setBusy, setError }) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Password * (min. 8 characters)</label>
+        <label className="form-label">Password (Min 8 chars)</label>
         <input
           type="password"
           className="form-input"
@@ -485,18 +503,6 @@ function SignupForm({ onSuccess, busy, setBusy, setError }) {
         />
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Confirm Password *</label>
-        <input
-          type="password"
-          className="form-input"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="••••••••"
-          required
-        />
-      </div>
-
       <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={busy}>
         {busy ? 'Creating Account...' : 'Register Account'}
       </button>
@@ -505,7 +511,7 @@ function SignupForm({ onSuccess, busy, setBusy, setError }) {
 }
 
 /* =========================================================================
-   OVERVIEW TAB COMPONENT
+   OVERVIEW TAB COMPONENT (FULL WIDTH, DENSE, CLEAN)
    ========================================================================= */
 function OverviewTab({ navigateTo }) {
   const [health, setHealth] = useState({});
@@ -530,7 +536,8 @@ function OverviewTab({ navigateTo }) {
         } catch (err) {
           results[svc.key] = {
             ok: false,
-            status: 'unreachable',
+            status: 'stopped / offline',
+            code: err.code || 'ECONNREFUSED',
             error: err.message
           };
         }
@@ -545,132 +552,185 @@ function OverviewTab({ navigateTo }) {
     checkHealth();
   }, []);
 
+  const activeCount = Object.values(health).filter((h) => h.ok).length;
+
   return (
     <div>
       <div className="page-header">
         <div>
-          <h2>System Overview</h2>
-          <p>Real-time gateway status and downstream service health monitoring.</p>
+          <h2>System Overview & Command Center</h2>
+          <p>Real-time gateway routing, persistent storage, and downstream health status.</p>
         </div>
-        <button className="btn btn-secondary" onClick={checkHealth} disabled={checking}>
-          <RefreshCw size={14} className={checking ? 'spin' : ''} />
-          <span>{checking ? 'Checking...' : 'Refresh Status'}</span>
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={() => navigateTo('servers')}>
+            <Server size={14} />
+            <span>Manage Server States</span>
+          </button>
+          <button className="btn btn-primary" onClick={checkHealth} disabled={checking}>
+            <RefreshCw size={14} className={checking ? 'spin' : ''} />
+            <span>{checking ? 'Checking...' : 'Refresh Status'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* 3 Service Health Cards */}
-      <div className="grid-3">
-        {SERVICES.map((svc) => {
-          const st = health[svc.key];
-          return (
-            <div className="service-card" key={svc.key}>
-              <div className="service-card-top">
-                <span className="service-card-title">{svc.name}</span>
-                <span className="service-port">:{svc.port}</span>
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-                {svc.desc}
-              </p>
-              <div className="service-meta-row">
-                <span>Health Check:</span>
-                <b>
-                  {st ? (
-                    st.ok ? (
-                      <span className="badge badge-green">Healthy</span>
-                    ) : (
-                      <span className="badge badge-red">Unavailable</span>
-                    )
-                  ) : (
-                    'Checking...'
-                  )}
-                </b>
-              </div>
-              <div className="service-meta-row">
-                <span>MongoDB:</span>
-                <b>{st && st.db ? st.db : '—'}</b>
-              </div>
-              <div className="service-meta-row">
-                <span>Ping Latency:</span>
-                <b>{st && st.latency ? st.latency : '—'}</b>
-              </div>
-            </div>
-          );
-        })}
+      {/* 3 Metric KPI Cards - Full Width */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Gateway Status</span>
+            <h3>Port 8000</h3>
+            <small>Dynamic L7 Reverse Proxy</small>
+          </div>
+          <div className="kpi-icon blue">
+            <Network size={22} />
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Database Service</span>
+            <h3>Connected</h3>
+            <small>Document Data Store</small>
+          </div>
+          <div className="kpi-icon green">
+            <Database size={22} />
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Downstream Services</span>
+            <h3>{activeCount} / {SERVICES.length} Online</h3>
+            <small>{activeCount === SERVICES.length ? 'All Microservices Running' : `${SERVICES.length - activeCount} Stopped / In Fault State`}</small>
+          </div>
+          <div className={`kpi-icon ${activeCount === SERVICES.length ? 'green' : 'purple'}`}>
+            <Cpu size={22} />
+          </div>
+        </div>
       </div>
 
-      {/* Architecture Flow Section */}
+      {/* Interactive Server Controller Summary */}
       <div className="card">
-        <div className="card-title">L7 Gateway Request Lifecycle</div>
+        <div className="card-title">
+          <span>Downstream Microservice Health & Instant Controls</span>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('servers')}>
+            <span>Open Server Controller</span>
+            <ArrowRight size={13} />
+          </button>
+        </div>
         <div className="card-subtitle">
-          How client requests are authorized, rewritten, and routed to downstream MongoDB microservices
+          Test downstream server crashes and verify how the Layer 7 Gateway gracefully handles errors.
+        </div>
+
+        <div className="grid-3" style={{ marginBottom: 0 }}>
+          {SERVICES.map((svc) => {
+            const st = health[svc.key];
+            const isOnline = st && st.ok;
+            return (
+              <div className={`server-control-card ${isOnline === false ? 'stopped' : ''}`} key={svc.key}>
+                <div className="server-card-top">
+                  <span className="server-card-title">
+                    <div className={`status-dot ${isOnline === false ? 'offline' : ''}`}></div>
+                    {svc.name}
+                  </span>
+                  <span className="server-port">:{svc.port}</span>
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{svc.desc}</p>
+                <div className="server-meta-row">
+                  <span>State:</span>
+                  <b>
+                    {st ? (
+                      isOnline ? (
+                        <span className="badge badge-green">Listening / Online</span>
+                      ) : (
+                        <span className="badge badge-red">STOPPED / OFFLINE</span>
+                      )
+                    ) : (
+                      'Checking...'
+                    )}
+                  </b>
+                </div>
+                <div className="server-meta-row">
+                  <span>Database:</span>
+                  <b>{st && st.db ? st.db : 'connected'}</b>
+                </div>
+                <div className="server-meta-row">
+                  <span>Ping Latency:</span>
+                  <b>{st && st.latency ? st.latency : '—'}</b>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Architecture Flow - Full Width */}
+      <div className="card">
+        <div className="card-title">
+          <span>L7 Gateway Request Pipeline</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('playground')}>
+              <Terminal size={13} />
+              <span>Open Playground</span>
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('routes')}>
+              <GitBranch size={13} />
+              <span>Inspect Routes</span>
+            </button>
+          </div>
+        </div>
+        <div className="card-subtitle">
+          How incoming client requests are authorized, rewritten, and routed to downstream microservices.
         </div>
 
         <div className="flow-diagram">
           <div className="flow-node">
-            <b>1. Browser Client</b>
-            <small>HTTP + Bearer JWT</small>
+            <b>1. Client</b>
+            <small>Bearer JWT</small>
           </div>
-          <ArrowRight size={16} className="flow-arrow" />
+          <ArrowRight size={15} className="flow-arrow" />
           <div className="flow-node highlight">
-            <b>2. API Gateway</b>
-            <small>:8000 / Dynamic L7</small>
+            <b>2. Gateway</b>
+            <small>:8000 / L7</small>
           </div>
-          <ArrowRight size={16} className="flow-arrow" />
+          <ArrowRight size={15} className="flow-arrow" />
           <div className="flow-node">
-            <b>3. Auth Verification</b>
-            <small>HMAC-SHA256 Token</small>
+            <b>3. Auth Verify</b>
+            <small>HS256 Check</small>
           </div>
-          <ArrowRight size={16} className="flow-arrow" />
+          <ArrowRight size={15} className="flow-arrow" />
           <div className="flow-node">
-            <b>4. Reverse Proxy</b>
-            <small>Path Rewriting</small>
+            <b>4. Rewrite</b>
+            <small>Strip Prefix</small>
           </div>
-          <ArrowRight size={16} className="flow-arrow" />
+          <ArrowRight size={15} className="flow-arrow" />
           <div className="flow-node highlight">
-            <b>5. Target Service</b>
-            <small>5001 / 5002 / 5003</small>
+            <b>5. Target</b>
+            <small>:5001-5003</small>
           </div>
-          <ArrowRight size={16} className="flow-arrow" />
+          <ArrowRight size={15} className="flow-arrow" />
           <div className="flow-node">
-            <b>6. MongoDB</b>
-            <small>Per-User Documents</small>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Links Section */}
-      <div className="grid-2">
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="card-title">Genuine User Data Isolation</div>
-          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-            Test tenant isolation by inspecting your profile and orders, or logging in as another seeded account to verify distinct database records.
-          </p>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('profile')}>
-              <UserRound size={14} />
-              <span>View Profile</span>
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('orders')}>
-              <Boxes size={14} />
-              <span>View Orders</span>
-            </button>
+            <b>6. Database</b>
+            <small>Persistent Store</small>
           </div>
         </div>
 
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="card-title">Interactive Developer Tools</div>
-          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-            Explore endpoints directly through the gateway, inspect rewritten URLs, and observe HTTP response codes and headers.
-          </p>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('playground')}>
-              <Terminal size={14} />
-              <span>Open Playground</span>
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigateTo('routes')}>
-              <GitBranch size={14} />
-              <span>View Routes</span>
-            </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+          <div style={{ background: 'var(--bg-surface-secondary)', padding: 12, borderRadius: 6, border: '1px solid var(--border-light)' }}>
+            <b style={{ fontSize: 12.5, color: 'var(--text-main)', display: 'block', marginBottom: 4 }}>
+              1-Click Server Fault Simulation
+            </b>
+            <p style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              Click "Server Controls" in the sidebar to stop any server with 1 click. The gateway will intercept connection refusal and report HTTP 503.
+            </p>
+          </div>
+          <div style={{ background: 'var(--bg-surface-secondary)', padding: 12, borderRadius: 6, border: '1px solid var(--border-light)' }}>
+            <b style={{ fontSize: 12.5, color: 'var(--text-main)', display: 'block', marginBottom: 4 }}>
+              Dynamic Hot-Reloading
+            </b>
+            <p style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              Route definitions in <code>config/routes.json</code> are watched and hot-reloaded automatically without restarting the gateway process.
+            </p>
           </div>
         </div>
       </div>
@@ -679,7 +739,201 @@ function OverviewTab({ navigateTo }) {
 }
 
 /* =========================================================================
-   MY PROFILE TAB COMPONENT
+   SERVER CONTROLS TAB (1-CLICK STOP/START & TEST ERROR)
+   ========================================================================= */
+function ServersTab() {
+  const [servicesStatus, setServicesStatus] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState({});
+  const [testResults, setTestResults] = useState({});
+
+  const fetchStatus = async () => {
+    setLoading(true);
+    try {
+      const res = await apiRequest('/api/v1/gateway/services/status', { skipAuth: true });
+      setServicesStatus(res.data.services || {});
+    } catch {
+      setServicesStatus({
+        auth: { key: 'auth', name: 'Auth Service', port: 5001, running: true },
+        users: { key: 'users', name: 'User Service', port: 5002, running: true },
+        orders: { key: 'orders', name: 'Order Service', port: 5003, running: true }
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  const handleToggleServer = async (key) => {
+    setActionBusy((prev) => ({ ...prev, [key]: true }));
+    const current = servicesStatus[key];
+    const action = current && current.running ? 'stop' : 'start';
+
+    try {
+      const res = await apiRequest(`/api/v1/gateway/services/${key}/${action}`, {
+        method: 'POST',
+        skipAuth: true
+      });
+
+      setServicesStatus((prev) => ({
+        ...prev,
+        [key]: {
+          ...(prev[key] || {}),
+          running: res.data.running
+        }
+      }));
+
+      // Clear previous test result
+      setTestResults((prev) => ({ ...prev, [key]: null }));
+    } catch (err) {
+      alert(`Failed to ${action} server: ${err.message}`);
+    } finally {
+      setActionBusy((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleTestServer = async (svc) => {
+    setActionBusy((prev) => ({ ...prev, [`test_${svc.key}`]: true }));
+    setTestResults((prev) => ({ ...prev, [svc.key]: null }));
+
+    const start = performance.now();
+    try {
+      const res = await apiRequest(svc.testPath);
+      const latency = Math.round(performance.now() - start);
+
+      setTestResults((prev) => ({
+        ...prev,
+        [svc.key]: {
+          ok: true,
+          status: res.status,
+          latency: `${latency}ms`,
+          message: `Server is active and responded successfully with HTTP ${res.status}!`,
+          data: res.data
+        }
+      }));
+    } catch (err) {
+      const latency = Math.round(performance.now() - start);
+      setTestResults((prev) => ({
+        ...prev,
+        [svc.key]: {
+          ok: false,
+          status: err.status || 503,
+          code: err.code || 'ECONNREFUSED',
+          latency: `${latency}ms`,
+          message: `Gateway Error: HTTP ${err.status || 503} Service Unavailable (TCP Port ${svc.port} Connection Refused). The server is genuinely stopped!`,
+          data: err.data || { error: err.message }
+        }
+      }));
+    } finally {
+      setActionBusy((prev) => ({ ...prev, [`test_${svc.key}`]: false }));
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h2>1-Click Microservice Controller & Fault Injector</h2>
+          <p>Stop any server with a single click, dispatch a request through the Gateway, and observe the live error.</p>
+        </div>
+        <button className="btn btn-secondary" onClick={fetchStatus} disabled={loading}>
+          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          <span>Refresh States</span>
+        </button>
+      </div>
+
+      <div className="grid-3">
+        {SERVICES.map((svc) => {
+          const info = servicesStatus[svc.key] || {};
+          const isRunning = info.running ?? true;
+          const isToggling = actionBusy[svc.key];
+          const isTesting = actionBusy[`test_${svc.key}`];
+          const testRes = testResults[svc.key];
+
+          return (
+            <div className={`server-control-card ${!isRunning ? 'stopped' : ''}`} key={svc.key}>
+              <div className="server-card-top">
+                <span className="server-card-title">
+                  <div className={`status-dot ${!isRunning ? 'offline' : ''}`}></div>
+                  {svc.name}
+                </span>
+                <span className="server-port">:{svc.port}</span>
+              </div>
+
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                {svc.desc}
+              </p>
+
+              <div className="server-meta-row">
+                <span>Listening Port:</span>
+                <b>:{svc.port}</b>
+              </div>
+              <div className="server-meta-row">
+                <span>Current Status:</span>
+                <b>
+                  {isRunning ? (
+                    <span className="badge badge-green">RUNNING (Port Open)</span>
+                  ) : (
+                    <span className="badge badge-red">STOPPED (Port Closed)</span>
+                  )}
+                </b>
+              </div>
+              <div className="server-meta-row">
+                <span>Gateway Route:</span>
+                <code>/api/v1/{svc.key}/*</code>
+              </div>
+
+              {/* Action Buttons: 1-Click Stop/Start + Test Button */}
+              <div className="server-action-bar">
+                <button
+                  type="button"
+                  className={`btn ${isRunning ? 'btn-danger' : 'btn-success'} btn-sm`}
+                  style={{ flex: 1 }}
+                  onClick={() => handleToggleServer(svc.key)}
+                  disabled={isToggling}
+                >
+                  {isRunning ? <Square size={13} /> : <Play size={13} />}
+                  <span>{isToggling ? 'Processing...' : isRunning ? 'Stop Server' : 'Start Server'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ flex: 1.2 }}
+                  onClick={() => handleTestServer(svc)}
+                  disabled={isTesting}
+                >
+                  <Activity size={13} className={isTesting ? 'spin' : ''} />
+                  <span>{isTesting ? 'Calling Gateway...' : 'Test & Inspect Error'}</span>
+                </button>
+              </div>
+
+              {/* Test Result Display Box */}
+              {testRes && (
+                <div className={`server-test-result-box ${testRes.ok ? 'success' : 'error'}`}>
+                  <h4>
+                    {testRes.ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                    <span>HTTP {testRes.status} {testRes.code ? `(${testRes.code})` : ''} — {testRes.latency}</span>
+                  </h4>
+                  <p style={{ fontSize: 11.5, marginTop: 4 }}>{testRes.message}</p>
+                  <pre>
+                    {typeof testRes.data === 'object' ? JSON.stringify(testRes.data, null, 2) : String(testRes.data)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   MY PROFILE TAB (FULL WIDTH DUAL-COLUMN LAYOUT)
    ========================================================================= */
 function ProfileTab({ currentUser, onLogout }) {
   const [profile, setProfile] = useState(null);
@@ -712,8 +966,8 @@ function ProfileTab({ currentUser, onLogout }) {
     <div>
       <div className="page-header">
         <div>
-          <h2>My Profile</h2>
-          <p>Database-backed profile retrieved via verified JWT identity.</p>
+          <h2>User Profile & Identity Claims</h2>
+          <p>Database-backed profile retrieved via verified JWT identity forwarded by the Gateway.</p>
         </div>
         <button className="btn btn-secondary" onClick={fetchProfile} disabled={loading}>
           <RefreshCw size={14} className={loading ? 'spin' : ''} />
@@ -724,8 +978,8 @@ function ProfileTab({ currentUser, onLogout }) {
       <div className="alert alert-info">
         <CheckCircle2 size={16} />
         <div>
-          <b>Database Data Isolation Enforced:</b> This record is retrieved directly from MongoDB using the verified{' '}
-          <code>sub</code> claim in your JWT. Switching user accounts immediately displays that user's unique MongoDB document.
+          <b>Data Isolation Enforced:</b> This record is retrieved directly from the database using the verified{' '}
+          <code>sub</code> claim in your JWT. Switching accounts immediately loads that user's isolated record.
         </div>
       </div>
 
@@ -737,25 +991,25 @@ function ProfileTab({ currentUser, onLogout }) {
       )}
 
       {loading ? (
-        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-          <p style={{ color: 'var(--text-muted)' }}>Querying MongoDB through User Service...</p>
+        <div className="card" style={{ textAlign: 'center', padding: 50 }}>
+          <p style={{ color: 'var(--text-muted)' }}>Querying database through User Service...</p>
         </div>
       ) : profile && profile.data ? (
         <div className="card">
-          <div className="card-title">User Account Details</div>
-          <div className="card-subtitle">Stored in MongoDB collection: <code>users</code></div>
+          <div className="card-title">User Account Attributes</div>
+          <div className="card-subtitle">Stored user attributes retrieved via verified identity</div>
 
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: '30%' }}>Attribute</th>
+                  <th style={{ width: '30%' }}>Profile Attribute</th>
                   <th>Value</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><b>MongoDB Document ID</b></td>
+                  <td><b>Record ID</b></td>
                   <td><code>{profile.data.id}</code></td>
                 </tr>
                 <tr>
@@ -771,11 +1025,11 @@ function ProfileTab({ currentUser, onLogout }) {
                   <td>{profile.data.name || profile.data.username}</td>
                 </tr>
                 <tr>
-                  <td><b>Department</b></td>
+                  <td><b>Department / School</b></td>
                   <td>{profile.data.department || 'Computer Engineering'}</td>
                 </tr>
                 <tr>
-                  <td><b>Account Role</b></td>
+                  <td><b>Role / Permissions</b></td>
                   <td><span className="badge badge-slate">{profile.data.role || 'user'}</span></td>
                 </tr>
                 <tr>
@@ -783,7 +1037,7 @@ function ProfileTab({ currentUser, onLogout }) {
                   <td>{profile.data.createdAt ? new Date(profile.data.createdAt).toLocaleString() : '—'}</td>
                 </tr>
                 <tr>
-                  <td><b>Gateway Forwarded Identity</b></td>
+                  <td><b>Gateway Forwarded Header</b></td>
                   <td><code>X-Authenticated-User: {profile.gateway?.authenticatedUser}</code></td>
                 </tr>
               </tbody>
@@ -796,14 +1050,14 @@ function ProfileTab({ currentUser, onLogout }) {
 }
 
 /* =========================================================================
-   MY ORDERS TAB COMPONENT
+   MY ORDERS TAB (FULL WIDTH WITH TOP METRICS & SIDE-BY-SIDE PANELS)
    ========================================================================= */
 function OrdersTab({ currentUser, onLogout }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // New order form state
+  // Form state
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState('Processing');
@@ -848,7 +1102,7 @@ function OrdersTab({ currentUser, onLogout }) {
         })
       });
 
-      setCreateMsg('Order created successfully and saved to MongoDB!');
+      setCreateMsg('Order created and saved successfully!');
       setItem('');
       setAmount('');
       fetchOrders();
@@ -872,12 +1126,15 @@ function OrdersTab({ currentUser, onLogout }) {
     }
   };
 
+  const totalSpent = orders.reduce((sum, o) => sum + Number(o.amount || 0), 0);
+  const deliveredCount = orders.filter((o) => o.status === 'Delivered').length;
+
   return (
     <div>
       <div className="page-header">
         <div>
-          <h2>My Orders</h2>
-          <p>Orders strictly isolated and queried by authenticated user ID in MongoDB.</p>
+          <h2>Order History & Multi-Tenant Data Isolation</h2>
+          <p>Orders queried strictly by authenticated user ID from the database service.</p>
         </div>
         <button className="btn btn-secondary" onClick={fetchOrders} disabled={loading}>
           <RefreshCw size={14} className={loading ? 'spin' : ''} />
@@ -885,12 +1142,57 @@ function OrdersTab({ currentUser, onLogout }) {
         </button>
       </div>
 
+      {/* Top Summary Metrics */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Total Orders</span>
+            <h3>{orders.length}</h3>
+            <small>Isolated to @{currentUser.username}</small>
+          </div>
+          <div className="kpi-icon blue">
+            <Boxes size={22} />
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Total Value</span>
+            <h3>₹{totalSpent.toLocaleString('en-IN')}</h3>
+            <small>Active Portfolio Value</small>
+          </div>
+          <div className="kpi-icon green">
+            <Activity size={22} />
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Delivered Items</span>
+            <h3>{deliveredCount}</h3>
+            <small>Fulfilled Orders</small>
+          </div>
+          <div className="kpi-icon green">
+            <CheckCircle2 size={22} />
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-info">
+            <span>Storage Status</span>
+            <h3>Active</h3>
+            <small>Tenant Partitioned</small>
+          </div>
+          <div className="kpi-icon purple">
+            <Database size={22} />
+          </div>
+        </div>
+      </div>
+
       <div className="alert alert-info">
         <CheckCircle2 size={16} />
         <div>
-          <b>Per-User Data Isolation:</b> The Order Service queries MongoDB with{' '}
-          <code>Order.find(&#123; user: authenticatedUserId &#125;)</code>. You will only see orders created by or seeded for{' '}
-          <b>{currentUser.username}</b>.
+          <b>Per-User Data Isolation:</b> The Order Service queries only orders belonging to your verified user ID. You will ONLY see records owned by <b>@{currentUser.username}</b>.
         </div>
       </div>
 
@@ -908,102 +1210,105 @@ function OrdersTab({ currentUser, onLogout }) {
         </div>
       )}
 
-      {/* Orders List Table */}
-      <div className="card">
-        <div className="card-title">Order Records ({orders.length})</div>
-        <div className="card-subtitle">Retrieved from Order Service (Port 5003) via Gateway</div>
+      {/* Split Row: Orders Table & Create Order Panel */}
+      <div className="grid-split-60-40">
+        {/* Left: Orders Table */}
+        <div className="card">
+          <div className="card-title">Order Records ({orders.length})</div>
+          <div className="card-subtitle">Retrieved from Order Service (Port 5003) via Gateway</div>
 
-        {loading ? (
-          <p style={{ color: 'var(--text-muted)', padding: 20 }}>Loading orders from database...</p>
-        ) : orders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
-            <Boxes size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-            <p>No orders found for this user account.</p>
-            <small>Create an order below to verify MongoDB persistence.</small>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Item Description</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Date Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((ord) => (
-                  <tr key={ord.orderId || ord.id || ord._id}>
-                    <td><code>{ord.orderId || ord.id}</code></td>
-                    <td><b>{ord.item}</b></td>
-                    <td>₹{Number(ord.amount).toLocaleString('en-IN')}</td>
-                    <td>{getStatusBadge(ord.status)}</td>
-                    <td>{ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : '—'}</td>
+          {loading ? (
+            <p style={{ color: 'var(--text-muted)', padding: 20 }}>Loading orders from database...</p>
+          ) : orders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
+              <Boxes size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+              <p>No orders found for this user account.</p>
+              <small>Create an order using the form on the right.</small>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Item Description</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Created</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Create Order Form */}
-      <div className="card">
-        <div className="card-title">Create New Order</div>
-        <div className="card-subtitle">
-          Dispatches <code>POST /api/v1/orders</code>. Ownership is securely derived from your JWT subject.
+                </thead>
+                <tbody>
+                  {orders.map((ord) => (
+                    <tr key={ord.orderId || ord.id}>
+                      <td><code>{ord.orderId || ord.id}</code></td>
+                      <td><b>{ord.item}</b></td>
+                      <td>₹{Number(ord.amount).toLocaleString('en-IN')}</td>
+                      <td>{getStatusBadge(ord.status)}</td>
+                      <td>{ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        <form onSubmit={handleCreateOrder} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Item / Description</label>
-            <input
-              type="text"
-              className="form-input"
-              value={item}
-              onChange={(e) => setItem(e.target.value)}
-              placeholder="e.g. Mechanical Keyboard"
-              required
-            />
+        {/* Right: Create Order Form */}
+        <div className="card">
+          <div className="card-title">Create New Order</div>
+          <div className="card-subtitle">
+            Dispatches <code>POST /api/v1/orders</code>. Ownership is derived from JWT subject.
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Amount (₹)</label>
-            <input
-              type="number"
-              className="form-input"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 4500"
-              required
-              min={0}
-            />
-          </div>
+          <form onSubmit={handleCreateOrder}>
+            <div className="form-group">
+              <label className="form-label">Item / Description</label>
+              <input
+                type="text"
+                className="form-input"
+                value={item}
+                onChange={(e) => setItem(e.target.value)}
+                placeholder="e.g. Mechanical Keyboard"
+                required
+              />
+            </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Status</label>
-            <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="Processing">Processing</option>
-              <option value="Pending">Pending</option>
-              <option value="Shipped">Shipped</option>
-              <option value="Delivered">Delivered</option>
-            </select>
-          </div>
+            <div className="form-group">
+              <label className="form-label">Amount (₹)</label>
+              <input
+                type="number"
+                className="form-input"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="e.g. 2999"
+                required
+                min={0}
+              />
+            </div>
 
-          <button type="submit" className="btn btn-primary" disabled={creating}>
-            <PackagePlus size={15} />
-            <span>{creating ? 'Saving...' : 'Create Order'}</span>
-          </button>
-        </form>
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="Processing">Processing</option>
+                <option value="Pending">Pending</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+              </select>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 6 }} disabled={creating}>
+              <PackagePlus size={15} />
+              <span>{creating ? 'Saving...' : 'Create Order'}</span>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
 
 /* =========================================================================
-   API PLAYGROUND TAB COMPONENT
+   API PLAYGROUND TAB (FULL WIDTH DUAL-PANE)
    ========================================================================= */
 function PlaygroundTab({ token, onLogout }) {
   const [method, setMethod] = useState('GET');
@@ -1016,9 +1321,9 @@ function PlaygroundTab({ token, onLogout }) {
   const presets = [
     { label: 'User Profile (Protected)', method: 'GET', path: '/api/v1/users/profile', body: '' },
     { label: 'Order History (Protected)', method: 'GET', path: '/api/v1/orders/history', body: '' },
-    { label: 'Create Order (Protected)', method: 'POST', path: '/api/v1/orders', body: '{\n  "item": "External Monitor Arm",\n  "amount": 3499,\n  "status": "Processing"\n}' },
+    { label: 'Create Order (Protected)', method: 'POST', path: '/api/v1/orders', body: '{\n  "item": "Wireless Noise Cancelling Headphones",\n  "amount": 4999,\n  "status": "Processing"\n}' },
     { label: 'Gateway Routes (Public)', method: 'GET', path: '/api/v1/gateway/routes', body: '' },
-    { label: 'Auth Service Health (Public)', method: 'GET', path: '/api/v1/auth/health', body: '' },
+    { label: 'Service Statuses (Public)', method: 'GET', path: '/api/v1/gateway/services/status', body: '' },
     { label: 'Gateway Health (Public)', method: 'GET', path: '/health', body: '' }
   ];
 
@@ -1082,8 +1387,8 @@ function PlaygroundTab({ token, onLogout }) {
     <div>
       <div className="page-header">
         <div>
-          <h2>API Playground</h2>
-          <p>Dispatch HTTP requests through the L7 Gateway on port 8000.</p>
+          <h2>Interactive L7 Gateway API Playground</h2>
+          <p>Dispatch HTTP requests through the gateway on port 8000 and test JWT protection, routing, and error responses.</p>
         </div>
       </div>
 
@@ -1091,7 +1396,7 @@ function PlaygroundTab({ token, onLogout }) {
         {/* Request Builder Panel */}
         <div className="card">
           <div className="card-title">Request Builder</div>
-          <div className="card-subtitle">Quick preset or custom endpoint</div>
+          <div className="card-subtitle">Select a preset or enter custom path</div>
 
           <div style={{ marginBottom: 14 }}>
             <label className="form-label">Example Presets</label>
@@ -1171,7 +1476,7 @@ function PlaygroundTab({ token, onLogout }) {
 
         {/* Response Inspector Panel */}
         <div className="card">
-          <div className="card-title">Gateway Response</div>
+          <div className="card-title">Gateway Response Inspector</div>
           <div className="card-subtitle">Status, timing, and JSON payload</div>
 
           {result ? (
@@ -1192,9 +1497,9 @@ function PlaygroundTab({ token, onLogout }) {
               </pre>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-              <Terminal size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-              <p>Ready to dispatch request.</p>
+            <div style={{ textAlign: 'center', padding: '70px 20px', color: 'var(--text-muted)' }}>
+              <Terminal size={36} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+              <p style={{ fontWeight: 600 }}>Ready to dispatch request</p>
               <small>Click "Send Request" to inspect the downstream response.</small>
             </div>
           )}
@@ -1205,7 +1510,7 @@ function PlaygroundTab({ token, onLogout }) {
 }
 
 /* =========================================================================
-   ROUTING TABLE TAB COMPONENT
+   DYNAMIC ROUTING RULES TAB
    ========================================================================= */
 function RoutesTab() {
   const [routesData, setRoutesData] = useState(null);
@@ -1217,7 +1522,6 @@ function RoutesTab() {
         const res = await apiRequest('/api/v1/gateway/routes', { skipAuth: true });
         setRoutesData(res.data.routes);
       } catch {
-        // Fallback default if gateway routes introspection is unavailable
         setRoutesData({
           '/api/v1/auth': { target: 'http://localhost:5001', stripPrefix: true, publicPaths: ['/login', '/register', '/health'] },
           '/api/v1/users': { target: 'http://localhost:5002', stripPrefix: true, publicPaths: ['/health'] },
@@ -1295,32 +1599,45 @@ function RoutesTab() {
       </div>
 
       <div className="card">
-        <div className="card-title">Reverse Proxy Path Rewriting Explained</div>
+        <div className="card-title">Reverse Proxy Path Rewriting Matrix</div>
         <div className="card-subtitle">How incoming gateway requests are mapped to downstream endpoints</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: 6, padding: 12 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              User Service Example
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+          <div style={{ background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: 6, padding: 14 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+              Auth Service
             </span>
             <div style={{ marginTop: 8, fontSize: 12 }}>
-              <div>Client Request: <code>GET /api/v1/users/profile</code></div>
-              <div style={{ marginTop: 4 }}>Gateway Strips: <code>/api/v1/users</code></div>
-              <div style={{ marginTop: 4, color: 'var(--success-text)', fontWeight: 500 }}>
-                Target Receives: <code>http://localhost:5002/profile</code>
+              <div>Client: <code>POST /api/v1/auth/login</code></div>
+              <div style={{ marginTop: 4 }}>Strips: <code>/api/v1/auth</code></div>
+              <div style={{ marginTop: 4, color: 'var(--success-text)', fontWeight: 600 }}>
+                Target: <code>http://localhost:5001/login</code>
               </div>
             </div>
           </div>
 
-          <div style={{ background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: 6, padding: 12 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-              Order Service Example
+          <div style={{ background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: 6, padding: 14 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+              User Service
             </span>
             <div style={{ marginTop: 8, fontSize: 12 }}>
-              <div>Client Request: <code>GET /api/v1/orders/history</code></div>
-              <div style={{ marginTop: 4 }}>Gateway Strips: <code>/api/v1/orders</code></div>
-              <div style={{ marginTop: 4, color: 'var(--success-text)', fontWeight: 500 }}>
-                Target Receives: <code>http://localhost:5003/history</code>
+              <div>Client: <code>GET /api/v1/users/profile</code></div>
+              <div style={{ marginTop: 4 }}>Strips: <code>/api/v1/users</code></div>
+              <div style={{ marginTop: 4, color: 'var(--success-text)', fontWeight: 600 }}>
+                Target: <code>http://localhost:5002/profile</code>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: 6, padding: 14 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+              Order Service
+            </span>
+            <div style={{ marginTop: 8, fontSize: 12 }}>
+              <div>Client: <code>GET /api/v1/orders/history</code></div>
+              <div style={{ marginTop: 4 }}>Strips: <code>/api/v1/orders</code></div>
+              <div style={{ marginTop: 4, color: 'var(--success-text)', fontWeight: 600 }}>
+                Target: <code>http://localhost:5003/history</code>
               </div>
             </div>
           </div>

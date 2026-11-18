@@ -55,9 +55,9 @@ function createRouteProxy(route) {
       },
 
       error: (error, req, res) => {
+        const errorCode = error.code || "ECONNREFUSED";
         console.error(
-          `[Proxy] Downstream error for ${req.method} ${req.originalUrl}:`,
-          error.code || error.message
+          `[Proxy] Downstream error for ${req.method} ${req.originalUrl}: ${errorCode} (${error.message})`
         );
 
         if (res.destroyed || res.writableEnded) {
@@ -76,7 +76,16 @@ function createRouteProxy(route) {
         res.end(
           JSON.stringify({
             error: "Downstream Service Unavailable",
-            status: 503
+            status: 503,
+            code: errorCode,
+            target: route.target,
+            message: `Target ${route.target} refused connection. The microservice server is stopped or offline.`,
+            gateway: {
+              route: route.prefix,
+              method: req.method,
+              path: req.originalUrl,
+              timestamp: new Date().toISOString()
+            }
           })
         );
       }
