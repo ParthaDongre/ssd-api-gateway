@@ -1,12 +1,16 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+let staticRoutes = {};
+try {
+  staticRoutes = require("../../config/routes.json");
+} catch (_) {}
+
 const CONFIG_PATH = path.resolve(
   __dirname,
   "../../config/routes.json"
 );
 
-let activeRoutes = Object.freeze({});
 let watcher = null;
 let debounceTimer = null;
 let reloadInProgress = false;
@@ -119,11 +123,20 @@ function validateConfig(parsed) {
 }
 
 function loadRoutes() {
-  const fileContent = fs.readFileSync(CONFIG_PATH, "utf8");
-  const parsed = JSON.parse(fileContent);
-
-  return validateConfig(parsed);
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const fileContent = fs.readFileSync(CONFIG_PATH, "utf8");
+      const parsed = JSON.parse(fileContent);
+      return validateConfig(parsed);
+    }
+  } catch (err) {
+    console.warn("[Config] Notice reading route file:", err.message);
+  }
+  return validateConfig(staticRoutes);
 }
+
+// Pre-initialize active routes so it is immediately available on module import
+let activeRoutes = loadRoutes();
 
 function reloadRoutes() {
   if (reloadInProgress) {
@@ -204,13 +217,16 @@ function startWatching() {
 }
 
 function initializeConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    throw new Error(`Route configuration not found: ${CONFIG_PATH}`);
-  }
-
-  // Initial configuration errors are fatal. Later reload errors are not.
+  const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   activeRoutes = loadRoutes();
-  startWatching();
+
+  if (!isVercel) {
+    try {
+      startWatching();
+    } catch (err) {
+      console.warn("[Config] Watcher skipped:", err.message);
+    }
+  }
 
   console.log(
     `[Config] Initialized with ${Object.keys(activeRoutes).length} routes.`

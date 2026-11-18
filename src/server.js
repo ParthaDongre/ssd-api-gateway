@@ -32,6 +32,12 @@ app.disable("x-powered-by");
 // Parse JSON specifically for gateway control endpoints
 const jsonParser = express.json();
 
+// In Vercel serverless environment, parse JSON bodies for in-process dispatch
+if (isVercel) {
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ extended: true }));
+}
+
 // CORS headers to enable seamless local frontend and dev tool integration
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -179,6 +185,9 @@ app.use((req, res, next) => {
         if (req.user.username) {
           req.headers["x-authenticated-username"] = String(req.user.username);
         }
+      }
+      if (req.body && typeof req.body === "object") {
+        req._body = true;
       }
       return targetApp(req, res, next);
     }

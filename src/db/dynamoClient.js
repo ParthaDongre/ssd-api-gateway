@@ -24,15 +24,23 @@ const ORDERS_TABLE = process.env.DYNAMODB_ORDERS_TABLE || "ssd_orders";
 const REGION = process.env.AWS_REGION || "us-east-1";
 
 // Persistent disk storage file for offline development
-const DATA_DIR = path.resolve(__dirname, "../../data");
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DATA_DIR = isVercel
+  ? path.join("/tmp", "ssd_data")
+  : path.resolve(__dirname, "../../data");
+
 const DB_FILE =
   process.env.NODE_ENV === "test"
     ? path.join(DATA_DIR, "test_db.json")
     : path.join(DATA_DIR, "local_db.json");
 
 // Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn("[Database] Notice creating data directory:", err.message);
 }
 
 const memoryStore = {
@@ -326,8 +334,9 @@ async function ensureTables() {
 
     return { status: "cloud", region: REGION, tables: [USERS_TABLE, ORDERS_TABLE] };
   } catch (error) {
-    console.error("[Database] Error ensuring tables:", error.message);
-    return { status: "error", error: error.message };
+    console.warn("[Database] Error ensuring tables:", error.message);
+    disableCloudMode(error);
+    return { status: "fallback_local", error: error.message };
   }
 }
 
